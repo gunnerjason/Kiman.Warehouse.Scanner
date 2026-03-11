@@ -10,7 +10,9 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -20,7 +22,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 
-@androidx.annotation.OptIn(ExperimentalGetImage::class)
+@OptIn(ExperimentalGetImage::class)
 @Composable
 fun CameraPreview(
     lifecycleOwner: androidx.lifecycle.LifecycleOwner,
@@ -30,6 +32,10 @@ fun CameraPreview(
 ) {
     val context = LocalContext.current
     val executor = remember { Executors.newSingleThreadExecutor() }
+
+    // ✅ ALWAYS read latest values inside analyzer
+    val scanEnabledState = rememberUpdatedState(scanEnabled)
+    val onCodeDetectedState = rememberUpdatedState(onCodeDetected)
 
     val scanner = remember {
         val options = BarcodeScannerOptions.Builder()
@@ -47,7 +53,7 @@ fun CameraPreview(
             val cameraProvider = cameraProviderFuture.get()
 
             val preview = Preview.Builder().build().also {
-                it.surfaceProvider = previewView.surfaceProvider
+                it.setSurfaceProvider(previewView.surfaceProvider)
             }
 
             val analysis = ImageAnalysis.Builder()
@@ -55,7 +61,8 @@ fun CameraPreview(
                 .build()
 
             analysis.setAnalyzer(executor) { imageProxy: ImageProxy ->
-                if (!scanEnabled) {
+                // ✅ use latest state (not captured value)
+                if (!scanEnabledState.value) {
                     imageProxy.close()
                     return@setAnalyzer
                 }
@@ -69,14 +76,12 @@ fun CameraPreview(
                 val rotation = imageProxy.imageInfo.rotationDegrees
                 val inputImage = InputImage.fromMediaImage(mediaImage, rotation)
 
-                // ML Kit bounding boxes align with the rotated "upright" image.
-                // For 90/270 degrees, width/height swap.
                 val frameW = imageProxy.width
                 val frameH = imageProxy.height
                 val effW = if (rotation == 90 || rotation == 270) frameH else frameW
                 val effH = if (rotation == 90 || rotation == 270) frameW else frameH
 
-                // ROI: central 50% box (adjust if you want narrower/wider)
+                // ROI: center 50%
                 val roiLeft = (effW * 0.25f).toInt()
                 val roiTop = (effH * 0.25f).toInt()
                 val roiRight = (effW * 0.75f).toInt()
@@ -91,9 +96,9 @@ fun CameraPreview(
                             val cx = box.centerX()
                             val cy = box.centerY()
 
-                            // accept only if center is inside ROI
                             if (cx in roiLeft..roiRight && cy in roiTop..roiBottom) {
-                                onCodeDetected(raw)
+                                // ✅ call latest handler
+                                onCodeDetectedState.value(raw)
                                 break
                             }
                         }
@@ -122,9 +127,7 @@ fun CameraPreview(
         cameraProviderFuture.addListener(listener, ContextCompat.getMainExecutor(context))
 
         onDispose {
-            try {
-                ProcessCameraProvider.getInstance(context).get().unbindAll()
-            } catch (_: Exception) { }
+            try { ProcessCameraProvider.getInstance(context).get().unbindAll() } catch (_: Exception) {}
             executor.shutdown()
         }
     }
