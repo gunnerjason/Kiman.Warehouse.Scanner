@@ -13,50 +13,40 @@ class ScannerViewModel : ViewModel() {
 
     private val scannedCodes = mutableSetOf<String>()
 
-    fun startJob(nameOrBlank: String) {
-        val name = nameOrBlank.ifBlank { "Job-${System.currentTimeMillis()}" }
+    fun startJob(nameInput: String) {
+        val name = nameInput.ifBlank { "Job-${System.currentTimeMillis()}" }
+
         job.value = Job(
             name = name,
             startedAtMs = System.currentTimeMillis(),
             groups = mutableListOf(),
             currentGroup = Group(1)
         )
+
         scannedCodes.clear()
         status.value = "Job started: $name"
     }
 
     fun newGroup() {
-        val current = job.value ?: run { status.value = "No active job."; return }
+        val current = job.value ?: return
+
         if (current.currentGroup.items.isNotEmpty()) {
             current.groups.add(current.currentGroup)
         }
+
         val nextIndex = current.currentGroup.index + 1
         current.currentGroup = Group(nextIndex)
-        job.value = current.copy(groups = current.groups, currentGroup = current.currentGroup)
+
+        job.value = current.copy(
+            groups = current.groups,
+            currentGroup = current.currentGroup
+        )
+
         status.value = "New group #$nextIndex"
     }
 
-    fun finalizeForExport(): Job? {
-        val current = job.value ?: return null
-        if (current.currentGroup.items.isNotEmpty()) {
-            current.groups.add(current.currentGroup)
-            current.currentGroup = Group(current.currentGroup.index + 1)
-        }
-        job.value = current.copy(groups = current.groups, currentGroup = current.currentGroup)
-        return current
-    }
-
-    fun clearJob() {
-        job.value = null
-        scannedCodes.clear()
-        status.value = "Cleared."
-    }
-
     fun scan(code: String): ScanResult {
-        val current = job.value ?: run {
-            status.value = "No active job."
-            return ScanResult.NoJob
-        }
+        val current = job.value ?: return ScanResult.NoJob
 
         if (scannedCodes.contains(code)) {
             status.value = "Duplicate: $code"
@@ -64,10 +54,34 @@ class ScannerViewModel : ViewModel() {
         }
 
         scannedCodes.add(code)
-        current.currentGroup.items.add(ScanItem(code, System.currentTimeMillis()))
-        job.value = current.copy(groups = current.groups, currentGroup = current.currentGroup)
-        status.value = "Scanned: $code (group ${current.currentGroup.index})"
+        current.currentGroup.items.add(
+            ScanItem(code, System.currentTimeMillis())
+        )
+
+        job.value = current.copy(
+            groups = current.groups,
+            currentGroup = current.currentGroup
+        )
+
+        status.value = "Scanned: $code"
         return ScanResult.Success(code)
+    }
+
+    fun finalizeForExport(): Job? {
+        val current = job.value ?: return null
+
+        if (current.currentGroup.items.isNotEmpty()) {
+            current.groups.add(current.currentGroup)
+        }
+
+        job.value = current
+        return current
+    }
+
+    fun clearJob() {
+        job.value = null
+        scannedCodes.clear()
+        status.value = "Cleared"
     }
 }
 
