@@ -1,7 +1,31 @@
-@androidx.annotation.OptIn(ExperimentalGetImage::class)
+package kiman.warehouse.scanner.ui.scan
+
+import androidx.annotation.OptIn
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.LifecycleOwner
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
+import com.google.mlkit.vision.common.InputImage
+import java.util.concurrent.Executors
+
+@OptIn(ExperimentalGetImage::class)
 @Composable
-private fun CameraPreview(
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
+fun CameraPreview(
+    lifecycleOwner: LifecycleOwner,
     scanEnabled: Boolean,
     onCodeDetected: (String) -> Unit
 ) {
@@ -10,7 +34,7 @@ private fun CameraPreview(
 
     val scanner = remember {
         val options = BarcodeScannerOptions.Builder()
-            .setBarcodeFormats(com.google.mlkit.vision.barcode.common.Barcode.FORMAT_ALL_FORMATS)
+            .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
             .build()
         BarcodeScanning.getClient(options)
     }
