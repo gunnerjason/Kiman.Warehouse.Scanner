@@ -14,9 +14,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -30,7 +30,9 @@ fun StartJobScreen(
 ) {
     var jobName by remember { mutableStateOf("") }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Start New Job") }) }) { padding ->
+    Scaffold(
+        topBar = { TopAppBar(title = { Text("Start New Job") }) }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
@@ -44,7 +46,9 @@ fun StartJobScreen(
                 label = { Text("Job Name (optional)") },
                 modifier = Modifier.fillMaxWidth()
             )
+
             Spacer(Modifier.height(16.dp))
+
             Button(
                 onClick = {
                     vm.startJob(jobName)
