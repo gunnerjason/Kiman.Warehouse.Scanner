@@ -9,7 +9,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,10 +18,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -55,33 +54,27 @@ fun ScannerScreen(
     val job = vm.job.value
     val status = vm.status.value
 
-    // Camera permission
     var hasCamPermission by remember { mutableStateOf(false) }
     val camPermLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted -> hasCamPermission = granted }
 
-    LaunchedEffect(Unit) {
-        camPermLauncher.launch(Manifest.permission.CAMERA)
-    }
+    LaunchedEffect(Unit) { camPermLauncher.launch(Manifest.permission.CAMERA) }
 
-    // Tap-to-scan window: scan only for short time after tap
     var scanWindowOpen by remember { mutableStateOf(false) }
     var scanToken by remember { mutableStateOf(0) }
 
     LaunchedEffect(scanToken) {
         if (!scanWindowOpen) return@LaunchedEffect
-        delay(1200) // scan window length
+        delay(1200)
         scanWindowOpen = false
     }
 
-    // Export CSV (SAF)
     val createCsvLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/csv")
     ) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         val exportJob = vm.finalizeForExport() ?: return@rememberLauncherForActivityResult
-
         try {
             CsvExporter.export(context, exportJob, uri)
             vm.clearJob()
@@ -91,17 +84,14 @@ fun ScannerScreen(
         }
     }
 
-    // Detection handler (called from CameraPreview)
-    val onCodeDetected: (String) -> Unit = let@{ code ->
-        if (!scanWindowOpen) return@let
-
-        // Stop scanning window immediately after first result
+    val onCodeDetected: (String) -> Unit = { code ->
+        if (!scanWindowOpen) return@onCodeDetected
         scanWindowOpen = false
 
         when (vm.scan(code)) {
             is ScanResult.Success -> BeepPlayer.play()
             is ScanResult.Duplicate -> VibratorHelper.vibrate(context)
-            ScanResult.NoJob -> { /* ignore */ }
+            ScanResult.NoJob -> {}
         }
     }
 
@@ -114,85 +104,89 @@ fun ScannerScreen(
                 .padding(12.dp)
                 .fillMaxSize()
         ) {
-            // Camera area + ROI box + tap overlay
-            Box(
+
+            // ✅ Top content takes remaining space
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(320.dp)
+                    .weight(1f),
             ) {
-                if (!hasCamPermission) {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Camera permission required")
-                        Spacer(Modifier.height(12.dp))
-                        Button(onClick = { camPermLauncher.launch(Manifest.permission.CAMERA) }) {
-                            Text("Grant Camera Permission")
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(320.dp)
+                ) {
+                    if (!hasCamPermission) {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Camera permission required")
+                            Spacer(Modifier.height(12.dp))
+                            Button(onClick = { camPermLauncher.launch(Manifest.permission.CAMERA) }) {
+                                Text("Grant Camera Permission")
+                            }
+                        }
+                    } else {
+                        CameraPreview(
+                            lifecycleOwner = lifecycleOwner,
+                            scanEnabled = scanWindowOpen && job != null,
+                            onCodeDetected = onCodeDetected,
+                            modifier = Modifier.fillMaxSize()
+                        )
+
+                        // ROI box
+                        Box(
+                            modifier = Modifier
+                                .size(220.dp)
+                                .align(Alignment.Center)
+                                .border(3.dp, Color.Green)
+                        )
+
+                        // Tap overlay
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clickable {
+                                    if (job == null) {
+                                        vm.status.value = "Start a job first."
+                                        return@clickable
+                                    }
+                                    scanWindowOpen = true
+                                    scanToken++
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (scanWindowOpen) "Scanning..." else "Tap to Scan",
+                                color = Color.White
+                            )
                         }
                     }
-                } else {
-                    CameraPreview(
-                        lifecycleOwner = lifecycleOwner,
-                        scanEnabled = scanWindowOpen && job != null, // must have active job
-                        onCodeDetected = onCodeDetected
-                    )
-
-                    // ROI box (visual)
-                    Box(
-                        modifier = Modifier
-                            .size(220.dp)
-                            .align(Alignment.Center)
-                            .border(3.dp, Color.Green)
-                    )
-
-                    // Tap overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clickable {
-                                if (job == null) {
-                                    vm.status.value = "Start a job first."
-                                    return@clickable
-                                }
-                                scanWindowOpen = true
-                                scanToken++
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (scanWindowOpen) "Scanning..." else "Tap to Scan",
-                            color = Color.White
-                        )
-                    }
                 }
+
+                Spacer(Modifier.height(10.dp))
+                Text("Current Group: ${job?.currentGroup?.index ?: "-"}")
+                Text(status)
             }
 
-            Spacer(Modifier.height(10.dp))
-
-            Text("Current Group: ${job?.currentGroup?.index ?: "-"}")
-            Text(status)
-
-            Spacer(Modifier.height(14.dp))
-
-            // ✅ 3 buttons only (as requested)
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // ✅ Bottom buttons pinned to bottom
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 Button(
                     onClick = { vm.newGroup() },
                     enabled = job != null,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("New Group")
-                }
+                ) { Text("New Group") }
 
                 OutlinedButton(
                     onClick = onSummary,
                     enabled = job != null,
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Summary")
-                }
+                ) { Text("Summary") }
 
                 Button(
                     onClick = {
@@ -202,9 +196,7 @@ fun ScannerScreen(
                     enabled = job != null,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD32F2F)),
                     modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Finish Job")
-                }
+                ) { Text("Finish Job") }
             }
         }
     }
