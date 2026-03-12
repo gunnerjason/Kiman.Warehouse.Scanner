@@ -22,6 +22,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
 
+@ExperimentalGetImage
 @OptIn(ExperimentalGetImage::class)
 @Composable
 fun CameraPreview(
@@ -61,7 +62,7 @@ fun CameraPreview(
                 .build()
 
             analysis.setAnalyzer(executor) { imageProxy: ImageProxy ->
-                // ✅ use latest state (not captured value)
+                // use latest state (not captured value)
                 if (!scanEnabledState.value) {
                     imageProxy.close()
                     return@setAnalyzer

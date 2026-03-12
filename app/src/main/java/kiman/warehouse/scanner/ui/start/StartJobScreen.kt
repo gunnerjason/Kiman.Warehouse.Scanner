@@ -21,6 +21,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kiman.warehouse.scanner.viewmodel.ScannerViewModel
+import androidx.compose.foundation.Image
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import kiman.warehouse.scanner.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +33,7 @@ fun StartJobScreen(
     onStarted: () -> Unit
 ) {
     var jobName by remember { mutableStateOf("") }
+
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Start New Job") }) }
@@ -40,6 +45,17 @@ fun StartJobScreen(
                 .fillMaxSize(),
             verticalArrangement = Arrangement.Top
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo_bk),
+                contentDescription = "Kiman Logo",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                contentScale = ContentScale.Fit
+            )
+
+            Spacer(Modifier.height(16.dp))
+
             OutlinedTextField(
                 value = jobName,
                 onValueChange = { jobName = it },

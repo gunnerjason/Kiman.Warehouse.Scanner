@@ -4,6 +4,7 @@ import android.Manifest
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.ExperimentalGetImage
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -32,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import kiman.warehouse.scanner.util.BeepPlayer
 import kiman.warehouse.scanner.util.CsvExporter
@@ -41,6 +42,7 @@ import kiman.warehouse.scanner.viewmodel.ScanResult
 import kiman.warehouse.scanner.viewmodel.ScannerViewModel
 import kotlinx.coroutines.delay
 
+@ExperimentalGetImage
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScannerScreen(
@@ -49,7 +51,7 @@ fun ScannerScreen(
     onFinished: () -> Unit
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     val job = vm.job.value
     val status = vm.status.value
@@ -62,7 +64,7 @@ fun ScannerScreen(
     LaunchedEffect(Unit) { camPermLauncher.launch(Manifest.permission.CAMERA) }
 
     var scanWindowOpen by remember { mutableStateOf(false) }
-    var scanToken by remember { mutableStateOf(0) }
+    var scanToken by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(scanToken) {
         if (!scanWindowOpen) return@LaunchedEffect
@@ -85,18 +87,19 @@ fun ScannerScreen(
     }
 
     val onCodeDetected: (String) -> Unit = { code ->
-        if (!scanWindowOpen) return@onCodeDetected
-        scanWindowOpen = false
+        if (scanWindowOpen) {
+            scanWindowOpen = false
 
-        when (vm.scan(code)) {
-            is ScanResult.Success -> BeepPlayer.play()
-            is ScanResult.Duplicate -> VibratorHelper.vibrate(context)
-            ScanResult.NoJob -> {}
+            when (vm.scan(code)) {
+                is ScanResult.Success -> BeepPlayer.play()
+                is ScanResult.Duplicate -> VibratorHelper.vibrate(context)
+                ScanResult.NoJob -> {}
+            }
         }
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Barcode Scanner") }) }
+        topBar = { TopAppBar(title = { Text("Kiman Barcode Scanner") }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -105,7 +108,7 @@ fun ScannerScreen(
                 .fillMaxSize()
         ) {
 
-            // ✅ Top content takes remaining space
+            // Top content takes remaining space
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -114,7 +117,8 @@ fun ScannerScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(320.dp)
+                        .weight(1f)
+//                        .height(320.dp)
                 ) {
                     if (!hasCamPermission) {
                         Column(
@@ -139,7 +143,7 @@ fun ScannerScreen(
                         // ROI box
                         Box(
                             modifier = Modifier
-                                .size(220.dp)
+                                .size(240.dp)
                                 .align(Alignment.Center)
                                 .border(3.dp, Color.Green)
                         )
@@ -166,12 +170,13 @@ fun ScannerScreen(
                     }
                 }
 
-                Spacer(Modifier.height(10.dp))
-                Text("Current Group: ${job?.currentGroup?.index ?: "-"}")
-                Text(status)
             }
 
-            // ✅ Bottom buttons pinned to bottom
+//            Spacer(Modifier.height(10.dp))
+            Text("Current Group: ${job?.currentGroup?.index ?: "-"}")
+            Text(status)
+            Spacer(Modifier.height(20.dp))
+            // Bottom buttons pinned to bottom
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
